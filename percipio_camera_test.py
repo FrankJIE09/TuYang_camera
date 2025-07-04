@@ -79,9 +79,9 @@ class PercipioCameraTester:
 
         # 测试参数（快速测试版本）
         self.test_params = {
-            'frame_rate_test_duration': 1,  # 帧率测试持续时间（设为0跳过）
-            'repeatability_test_count': 5,  # 重复精度测试次数
-            'stability_test_duration': 5,  # 稳定性测试持续时间（设为0跳过）
+            'frame_rate_test_duration': 10,  # 帧率测试持续时间（设为0跳过）
+            'repeatability_test_count': 1000,  # 重复精度测试次数
+            'stability_test_duration': 10,  # 稳定性测试持续时间（设为0跳过）
             'noise_test_count': 5,  # 噪声测试次数
         }
 
@@ -215,15 +215,22 @@ class PercipioCameraTester:
             # 深度统计
             valid_mask = (depth_data > 0) & (depth_data < 65535)  # 假设16位深度
             if np.any(valid_mask):
-                valid_depths = depth_data[valid_mask]
+                valid_depths = depth_data[valid_mask].astype(np.float64)  # 转换为float64
+                
+                # 使用深度比例因子转换为毫米
+                if self.depth_scale_factor is not None:
+                    valid_depths_mm = valid_depths * self.depth_scale_factor
+                else:
+                    valid_depths_mm = valid_depths * 0.016  # 默认比例因子
+                
                 data['depth_stats'] = {
                     'valid_pixels': int(np.sum(valid_mask)),
                     'total_pixels': int(valid_mask.size),
                     'valid_ratio': float(np.sum(valid_mask) / valid_mask.size),
-                    'min_depth': float(np.min(valid_depths)),
-                    'max_depth': float(np.max(valid_depths)),
-                    'mean_depth': float(np.mean(valid_depths)),
-                    'std_depth': float(np.std(valid_depths))
+                    'min_depth': float(np.min(valid_depths_mm)),
+                    'max_depth': float(np.max(valid_depths_mm)),
+                    'mean_depth': float(np.mean(valid_depths_mm)),
+                    'std_depth': float(np.std(valid_depths_mm))
                 }
 
         return data
@@ -539,7 +546,9 @@ class PercipioCameraTester:
                 depth_data = self.capture_single_frame()
 
                 if depth_data is not None:
-                    depth_maps.append(depth_data)
+                    # 确保深度数据转换为float64以保持精度
+                    depth_data_float = depth_data.astype(np.float64)
+                    depth_maps.append(depth_data_float)
                     success_count += 1
                     time.sleep(0.5)  # 等待0.5秒
                 else:
@@ -555,7 +564,8 @@ class PercipioCameraTester:
         if len(depth_maps) < 2:
             return {'error': '有效数据不足，无法分析噪声'}
 
-        depth_maps = np.array(depth_maps)
+        # 转换为numpy数组，确保使用float64类型
+        depth_maps = np.array(depth_maps, dtype=np.float64)
 
         # 计算噪声统计
         # 假设相机和场景静止，深度变化主要由噪声引起

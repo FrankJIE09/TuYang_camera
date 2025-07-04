@@ -45,3 +45,4 @@ python -c "import pcammls; print('pcammls导入成功！')"
 echo ""
 echo "==== 配置完成！====="
 echo "下次激活该环境时会自动配置Percipio SDK环境变量。"
+ 
